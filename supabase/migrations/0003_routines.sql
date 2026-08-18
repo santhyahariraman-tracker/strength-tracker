@@ -1,16 +1,19 @@
--- Reusable workout routines/templates
+-- Reusable workout routines/templates: one per day of the week
 
 create table routines (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  name text not null,
-  created_at timestamptz not null default now()
+  day_of_week smallint not null check (day_of_week between 0 and 6), -- 0 = Sunday
+  focus text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, day_of_week)
 );
 
 create table routine_exercises (
   id uuid primary key default gen_random_uuid(),
   routine_id uuid not null references routines(id) on delete cascade,
   exercise_name text not null,
+  target_sets int not null default 1,
   target_reps int not null,
   position int not null default 0
 );

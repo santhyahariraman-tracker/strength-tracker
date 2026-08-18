@@ -7,8 +7,8 @@ export default async function RoutinesPage() {
 
   const { data: routines, error } = await supabase
     .from("routines")
-    .select("id, name, routine_exercises(id, exercise_name, target_reps, position)")
-    .order("created_at", { ascending: false });
+    .select("id, day_of_week, focus, routine_exercises(id, exercise_name, target_sets, target_reps, position)")
+    .order("day_of_week", { ascending: true });
 
   const { data: exs } = await supabase.from("exercises").select("name");
   const exerciseSuggestions = [...new Set((exs ?? []).map((e) => e.name))];
@@ -33,10 +33,15 @@ export default async function RoutinesPage() {
         <RoutinesList
           routines={(routines ?? []).map((r) => ({
             id: r.id,
-            name: r.name,
+            dayOfWeek: r.day_of_week,
+            focus: r.focus,
             items: [...r.routine_exercises]
               .sort((a, b) => a.position - b.position)
-              .map((it) => ({ exerciseName: it.exercise_name, targetReps: it.target_reps })),
+              .map((it) => ({
+                exerciseName: it.exercise_name,
+                targetSets: it.target_sets,
+                targetReps: it.target_reps,
+              })),
           }))}
           exerciseSuggestions={exerciseSuggestions}
         />

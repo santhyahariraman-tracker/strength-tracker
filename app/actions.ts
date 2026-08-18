@@ -211,14 +211,18 @@ export async function addSet(
   revalidatePath(`/workouts/${workoutId}`);
 }
 
-export type RoutineItemInput = { exerciseName: string; targetReps: number };
+export type RoutineItemInput = { exerciseName: string; targetSets: number; targetReps: number };
 
-export async function createRoutine(name: string, items: RoutineItemInput[]) {
+export async function createRoutine(
+  dayOfWeek: number,
+  focus: string,
+  items: RoutineItemInput[]
+) {
   const { supabase, user } = await requireUser();
 
   const { data: routine, error: routineError } = await supabase
     .from("routines")
-    .insert({ user_id: user.id, name })
+    .insert({ user_id: user.id, day_of_week: dayOfWeek, focus })
     .select()
     .single();
   if (routineError) throw new Error(routineError.message);
@@ -228,6 +232,7 @@ export async function createRoutine(name: string, items: RoutineItemInput[]) {
       items.map((it, idx) => ({
         routine_id: routine.id,
         exercise_name: it.exerciseName,
+        target_sets: it.targetSets,
         target_reps: it.targetReps,
         position: idx,
       }))
@@ -236,19 +241,21 @@ export async function createRoutine(name: string, items: RoutineItemInput[]) {
   }
 
   revalidatePath("/routines");
+  revalidatePath("/");
   return { id: routine.id as string };
 }
 
 export async function updateRoutine(
   routineId: string,
-  name: string,
+  dayOfWeek: number,
+  focus: string,
   items: RoutineItemInput[]
 ) {
   const { supabase } = await requireUser();
 
   const { error: updateError } = await supabase
     .from("routines")
-    .update({ name })
+    .update({ day_of_week: dayOfWeek, focus })
     .eq("id", routineId);
   if (updateError) throw new Error(updateError.message);
 
@@ -263,6 +270,7 @@ export async function updateRoutine(
       items.map((it, idx) => ({
         routine_id: routineId,
         exercise_name: it.exerciseName,
+        target_sets: it.targetSets,
         target_reps: it.targetReps,
         position: idx,
       }))
@@ -271,6 +279,7 @@ export async function updateRoutine(
   }
 
   revalidatePath("/routines");
+  revalidatePath("/");
 }
 
 export async function deleteRoutine(routineId: string) {
@@ -282,13 +291,14 @@ export async function deleteRoutine(routineId: string) {
 
 export async function setDailyGoal(
   date: string,
-  items: { exerciseName: string; targetReps: number }[]
+  focus: string,
+  items: RoutineItemInput[]
 ) {
   const { supabase, user } = await requireUser();
 
   const { data: goal, error: goalError } = await supabase
     .from("daily_goals")
-    .insert({ user_id: user.id, goal_date: date })
+    .insert({ user_id: user.id, goal_date: date, focus: focus || "Workout" })
     .select()
     .single();
   if (goalError) throw new Error(goalError.message);
@@ -298,6 +308,7 @@ export async function setDailyGoal(
       items.map((it) => ({
         goal_id: goal.id,
         exercise_name: it.exerciseName,
+        target_sets: it.targetSets,
         target_reps: it.targetReps,
       }))
     );
@@ -312,13 +323,14 @@ export async function completeGoalItem(
   goalId: string,
   itemId: string,
   exerciseName: string,
+  targetSets: number,
   input: SetInput
 ) {
   const { supabase, user } = await requireUser();
 
   const { data: goal, error: goalFetchError } = await supabase
     .from("daily_goals")
-    .select("goal_date")
+    .select("goal_date, focus")
     .eq("id", goalId)
     .single();
   if (goalFetchError) throw new Error(goalFetchError.message);
@@ -334,7 +346,7 @@ export async function completeGoalItem(
   if (!workout) {
     const { data: newWorkout, error: workoutError } = await supabase
       .from("workouts")
-      .insert({ user_id: user.id, workout_date: goal.goal_date, focus: "Daily Goal" })
+      .insert({ user_id: user.id, workout_date: goal.goal_date, focus: goal.focus })
       .select()
       .single();
     if (workoutError) throw new Error(workoutError.message);
@@ -355,13 +367,16 @@ export async function completeGoalItem(
   });
   if (exerciseError) throw new Error(exerciseError.message);
 
-  const { error: setError } = await supabase.from("sets").insert({
-    exercise_id: exercise.id,
-    set_number: 1,
-    reps: input.reps,
-    weight: input.weight,
-    weight_unit: input.weightUnit,
-  });
+  const setsToCreate = Math.max(1, targetSets);
+  const { error: setError } = await supabase.from("sets").insert(
+    Array.from({ length: setsToCreate }, (_, i) => ({
+      exercise_id: exercise.id,
+      set_number: i + 1,
+      reps: input.reps,
+      weight: input.weight,
+      weight_unit: input.weightUnit,
+    }))
+  );
   if (setError) throw new Error(setError.message);
 
   const { error: itemUpdateError } = await supabase

@@ -11,10 +11,21 @@ import {
   type ExerciseDraft,
 } from "@/components/ExerciseForm";
 
+const DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
 type Routine = {
   id: string;
-  name: string;
-  items: { exerciseName: string; targetReps: number }[];
+  dayOfWeek: number;
+  focus: string;
+  items: { exerciseName: string; targetSets: number; targetReps: number }[];
 };
 
 function todayLocalISO() {
@@ -50,15 +61,20 @@ export default function NewWorkoutPage() {
       }
       const { data: routineRows } = await supabase
         .from("routines")
-        .select("id, name, routine_exercises(exercise_name, target_reps, position)");
+        .select("id, day_of_week, focus, routine_exercises(exercise_name, target_sets, target_reps, position)");
       if (routineRows) {
         setRoutines(
           routineRows.map((r) => ({
             id: r.id,
-            name: r.name,
+            dayOfWeek: r.day_of_week,
+            focus: r.focus,
             items: [...r.routine_exercises]
               .sort((a, b) => a.position - b.position)
-              .map((it) => ({ exerciseName: it.exercise_name, targetReps: it.target_reps })),
+              .map((it) => ({
+                exerciseName: it.exercise_name,
+                targetSets: it.target_sets,
+                targetReps: it.target_reps,
+              })),
           }))
         );
       }
@@ -68,10 +84,15 @@ export default function NewWorkoutPage() {
   function loadRoutine(routineId: string) {
     const routine = routines.find((r) => r.id === routineId);
     if (!routine) return;
+    setFocus(routine.focus);
     setExercises(
       routine.items.map((it) => ({
         name: it.exerciseName,
-        sets: [{ reps: it.targetReps, weight: 0, weightUnit: "lbs" }],
+        sets: Array.from({ length: Math.max(1, it.targetSets) }, () => ({
+          reps: it.targetReps,
+          weight: 0,
+          weightUnit: "lbs" as const,
+        })),
       }))
     );
   }
@@ -187,7 +208,7 @@ export default function NewWorkoutPage() {
               </option>
               {routines.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {DAY_NAMES[r.dayOfWeek]} — {r.focus}
                 </option>
               ))}
             </select>

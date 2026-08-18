@@ -5,6 +5,7 @@ create table daily_goals (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   goal_date date not null,
+  focus text not null default 'Workout',
   completed_at timestamptz,
   created_at timestamptz not null default now(),
   unique (user_id, goal_date)
@@ -14,6 +15,7 @@ create table goal_items (
   id uuid primary key default gen_random_uuid(),
   goal_id uuid not null references daily_goals(id) on delete cascade,
   exercise_name text not null,
+  target_sets int not null default 1,
   target_reps int not null,
   exercise_id uuid references exercises(id) on delete set null,
   created_at timestamptz not null default now()

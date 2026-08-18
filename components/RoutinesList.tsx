@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { RoutineEditor, type RoutineDraft } from "@/components/RoutineEditor";
+import { RoutineEditor, DAY_NAMES, type RoutineDraft } from "@/components/RoutineEditor";
 
-type SavedRoutine = { id: string; name: string; items: { exerciseName: string; targetReps: number }[] };
+type SavedRoutine = {
+  id: string;
+  dayOfWeek: number;
+  focus: string;
+  items: { exerciseName: string; targetSets: number; targetReps: number }[];
+};
 
 export function RoutinesList({
   routines,
@@ -24,26 +29,36 @@ export function RoutinesList({
     );
   }
 
+  const byDay = [...routines].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  const usedDays = new Set(routines.map((r) => r.dayOfWeek));
+  const nextOpenDay = DAY_NAMES.findIndex((_, idx) => !usedDays.has(idx));
+
   return (
     <div className="flex flex-col gap-3">
       {routines.length === 0 && (
         <p className="text-sm text-text-muted">
-          No routines yet. Save one to quickly reuse it for the exercises you repeat
-          each week.
+          No routines yet. Set one up per day of the week — whichever day it is,
+          that routine auto-fills as your goal.
         </p>
       )}
 
       <div className="flex flex-col gap-2.5">
-        {routines.map((r) => (
+        {byDay.map((r) => (
           <button
             key={r.id}
             type="button"
-            onClick={() => setEditing({ id: r.id, name: r.name, items: r.items })}
+            onClick={() =>
+              setEditing({ id: r.id, dayOfWeek: r.dayOfWeek, focus: r.focus, items: r.items })
+            }
             className="text-left rounded-xl border border-border bg-surface px-4 py-3 active:bg-surface-2"
           >
-            <p className="font-medium">{r.name}</p>
+            <p className="font-medium">
+              {DAY_NAMES[r.dayOfWeek]} — {r.focus}
+            </p>
             <p className="text-xs text-text-muted mt-0.5">
-              {r.items.map((it) => it.exerciseName).join(", ")}
+              {r.items
+                .map((it) => `${it.exerciseName} (${it.targetSets}×${it.targetReps})`)
+                .join(", ")}
             </p>
           </button>
         ))}
@@ -51,7 +66,13 @@ export function RoutinesList({
 
       <button
         type="button"
-        onClick={() => setEditing({ name: "", items: [] })}
+        onClick={() =>
+          setEditing({
+            dayOfWeek: nextOpenDay === -1 ? 0 : nextOpenDay,
+            focus: "",
+            items: [],
+          })
+        }
         className="text-sm text-accent-orange font-medium self-start"
       >
         + New routine

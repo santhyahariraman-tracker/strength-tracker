@@ -71,13 +71,19 @@ export default async function DashboardPage({
   let todayGoal: {
     id: string;
     completed_at: string | null;
-    items: { id: string; exerciseName: string; targetReps: number; exerciseId: string | null }[];
+    items: {
+      id: string;
+      exerciseName: string;
+      targetSets: number;
+      targetReps: number;
+      exerciseId: string | null;
+    }[];
   } | null = null;
   let goalsTableExists = true;
 
   const goalRes = await supabase
     .from("daily_goals")
-    .select("id, completed_at, goal_items(id, exercise_name, target_reps, exercise_id)")
+    .select("id, completed_at, goal_items(id, exercise_name, target_sets, target_reps, exercise_id)")
     .eq("goal_date", todayISO)
     .maybeSingle();
 
@@ -90,26 +96,38 @@ export default async function DashboardPage({
       items: goalRes.data.goal_items.map((it) => ({
         id: it.id,
         exerciseName: it.exercise_name,
+        targetSets: it.target_sets,
         targetReps: it.target_reps,
         exerciseId: it.exercise_id,
       })),
     };
   }
 
-  // --- Routines, for the goal prompt's "load from routine" ---
-  let routines: { id: string; name: string; items: { exerciseName: string; targetReps: number }[] }[] = [];
+  // --- Routines (one per day of week), for auto-filling today's goal ---
+  let routines: {
+    id: string;
+    dayOfWeek: number;
+    focus: string;
+    items: { exerciseName: string; targetSets: number; targetReps: number }[];
+  }[] = [];
   const routinesRes = await supabase
     .from("routines")
-    .select("id, name, routine_exercises(exercise_name, target_reps, position)");
+    .select("id, day_of_week, focus, routine_exercises(exercise_name, target_sets, target_reps, position)");
   if (!routinesRes.error && routinesRes.data) {
     routines = routinesRes.data.map((r) => ({
       id: r.id,
-      name: r.name,
+      dayOfWeek: r.day_of_week,
+      focus: r.focus,
       items: [...r.routine_exercises]
         .sort((a, b) => a.position - b.position)
-        .map((it) => ({ exerciseName: it.exercise_name, targetReps: it.target_reps })),
+        .map((it) => ({
+          exerciseName: it.exercise_name,
+          targetSets: it.target_sets,
+          targetReps: it.target_reps,
+        })),
     }));
   }
+  const todayRoutine = routines.find((r) => r.dayOfWeek === now.getDay()) ?? null;
 
   const { data: exs } = await supabase.from("exercises").select("name");
   const exerciseSuggestions = [...new Set((exs ?? []).map((e) => e.name))];
@@ -227,7 +245,12 @@ export default async function DashboardPage({
             alreadyComplete={!!todayGoal.completed_at}
           />
         ) : (
-          <GoalPrompt date={todayISO} routines={routines} exerciseSuggestions={exerciseSuggestions} />
+          <GoalPrompt
+            date={todayISO}
+            todayRoutine={todayRoutine}
+            routines={routines}
+            exerciseSuggestions={exerciseSuggestions}
+          />
         )
       )}
 

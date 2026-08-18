@@ -9,11 +9,9 @@ import { exerciseEmoji } from "@/lib/exerciseEmoji";
 type GoalItem = {
   id: string;
   exerciseName: string;
+  targetSets: number;
   targetReps: number;
   exerciseId: string | null;
-  loggedReps?: number;
-  loggedWeight?: number;
-  loggedUnit?: "lbs" | "kg";
 };
 
 type Suggestion = { weight: number; unit: "lbs" | "kg" } | null;
@@ -56,7 +54,7 @@ export function DailyGoalCard({
     setSaving(true);
     setError(null);
     try {
-      const result = await completeGoalItem(goalId, item.id, item.exerciseName, {
+      const result = await completeGoalItem(goalId, item.id, item.exerciseName, item.targetSets, {
         reps,
         weight,
         weightUnit: unit,
@@ -103,7 +101,7 @@ export function DailyGoalCard({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.exerciseName}</p>
                   <p className="text-xs text-text-muted">
-                    Target: {item.targetReps} reps
+                    Target: {item.targetSets} × {item.targetReps} reps
                   </p>
                 </div>
                 {done ? (
