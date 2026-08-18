@@ -25,75 +25,40 @@ type LoggedSet = {
 
 type Suggestion = { weight: number; unit: "lbs" | "kg" } | null;
 
-const CONFETTI_COLORS = [
-  "#6c5ce7",
-  "#d97a2e",
-  "#ff5e5e",
-  "#ffd93d",
-  "#2ecc71",
-  "#00d2ff",
-  "#ff6fd8",
-];
+let chocolateShapes: ReturnType<typeof confetti.shapeFromText>[] | null = null;
+function getChocolateShapes() {
+  if (!chocolateShapes) {
+    chocolateShapes = ["🍫", "🍩", "🍪"].map((text) =>
+      confetti.shapeFromText({ text, scalar: 3.5 })
+    );
+  }
+  return chocolateShapes;
+}
 
 function fireGrandConfetti() {
   const duration = 5000;
   const end = Date.now() + duration;
+  const shapes = getChocolateShapes();
 
-  // Big opening pop, dead center.
-  confetti({
-    particleCount: 220,
-    spread: 100,
-    startVelocity: 55,
-    scalar: 1.2,
-    origin: { y: 0.55 },
-    colors: CONFETTI_COLORS,
-  });
-
-  // Continuous bursts from both sides for the full duration.
   (function frame() {
+    // Rain chocolate down from a random point along the top edge.
     confetti({
-      particleCount: 6,
-      angle: 60,
-      spread: 65,
-      startVelocity: 45,
-      origin: { x: 0, y: 0.65 },
-      colors: CONFETTI_COLORS,
-    });
-    confetti({
-      particleCount: 6,
-      angle: 120,
-      spread: 65,
-      startVelocity: 45,
-      origin: { x: 1, y: 0.65 },
-      colors: CONFETTI_COLORS,
+      particleCount: 3,
+      startVelocity: 12,
+      gravity: 0.6,
+      drift: 0,
+      ticks: 300,
+      shapes,
+      scalar: 1,
+      origin: { x: Math.random(), y: -0.05 },
+      angle: 270,
+      spread: 60,
     });
 
     if (Date.now() < end) {
       requestAnimationFrame(frame);
     }
   })();
-
-  // A couple extra bright pops partway through for good measure.
-  setTimeout(() => {
-    confetti({
-      particleCount: 120,
-      spread: 120,
-      startVelocity: 40,
-      scalar: 1.1,
-      origin: { y: 0.4 },
-      colors: CONFETTI_COLORS,
-    });
-  }, 1800);
-  setTimeout(() => {
-    confetti({
-      particleCount: 120,
-      spread: 120,
-      startVelocity: 40,
-      scalar: 1.1,
-      origin: { y: 0.4 },
-      colors: CONFETTI_COLORS,
-    });
-  }, 3400);
 }
 
 export function DailyGoalCard({
@@ -139,7 +104,7 @@ export function DailyGoalCard({
         onClick={fireGrandConfetti}
         className="text-xs border border-dashed border-accent-orange text-accent-orange rounded-lg py-1.5 self-start px-3"
       >
-        🎉 Test confetti
+        🍫 Test confetti
       </button>
 
       <div className="flex flex-col gap-2">
