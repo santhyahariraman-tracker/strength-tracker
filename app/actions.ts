@@ -319,11 +319,12 @@ export async function setDailyGoal(
   return { id: goal.id as string };
 }
 
-export async function completeGoalItem(
+export async function logGoalSet(
   goalId: string,
   itemId: string,
   exerciseName: string,
   targetSets: number,
+  setNumber: number,
   input: SetInput
 ) {
   const { supabase, user } = await requireUser();
@@ -354,53 +355,106 @@ export async function completeGoalItem(
   }
   if (!workout) throw new Error("Failed to find or create today's workout");
 
-  const { count: existingCount } = await supabase
-    .from("exercises")
-    .select("*", { count: "exact", head: true })
-    .eq("workout_id", workout.id);
+  const { data: existingItem, error: itemFetchError } = await supabase
+    .from("goal_items")
+    .select("exercise_id")
+    .eq("id", itemId)
+    .single();
+  if (itemFetchError) throw new Error(itemFetchError.message);
 
-  const { data: exercise, error: exerciseError } = await insertExerciseRow(supabase, {
-    workout_id: workout.id,
-    name: exerciseName,
-    position: existingCount ?? 0,
-    notes: null,
-  });
-  if (exerciseError) throw new Error(exerciseError.message);
+  let exerciseId = existingItem.exercise_id as string | null;
+  if (!exerciseId) {
+    const { count: existingCount } = await supabase
+      .from("exercises")
+      .select("*", { count: "exact", head: true })
+      .eq("workout_id", workout.id);
 
-  const setsToCreate = Math.max(1, targetSets);
-  const { error: setError } = await supabase.from("sets").insert(
-    Array.from({ length: setsToCreate }, (_, i) => ({
-      exercise_id: exercise.id,
-      set_number: i + 1,
+    const { data: exercise, error: exerciseError } = await insertExerciseRow(supabase, {
+      workout_id: workout.id,
+      name: exerciseName,
+      position: existingCount ?? 0,
+      notes: null,
+    });
+    if (exerciseError) throw new Error(exerciseError.message);
+    exerciseId = exercise.id as string;
+
+    const { error: itemUpdateError } = await supabase
+      .from("goal_items")
+      .update({ exercise_id: exerciseId })
+      .eq("id", itemId);
+    if (itemUpdateError) throw new Error(itemUpdateError.message);
+  }
+
+  const { data: existingSet } = await supabase
+    .from("sets")
+    .select("id")
+    .eq("exercise_id", exerciseId)
+    .eq("set_number", setNumber)
+    .maybeSingle();
+
+  if (existingSet) {
+    const { error: updateError } = await supabase
+      .from("sets")
+      .update({ reps: input.reps, weight: input.weight, weight_unit: input.weightUnit })
+      .eq("id", existingSet.id);
+    if (updateError) throw new Error(updateError.message);
+  } else {
+    const { error: insertError } = await supabase.from("sets").insert({
+      exercise_id: exerciseId,
+      set_number: setNumber,
       reps: input.reps,
       weight: input.weight,
       weight_unit: input.weightUnit,
-    }))
-  );
-  if (setError) throw new Error(setError.message);
+    });
+    if (insertError) throw new Error(insertError.message);
+  }
 
-  const { error: itemUpdateError } = await supabase
-    .from("goal_items")
-    .update({ exercise_id: exercise.id })
-    .eq("id", itemId);
-  if (itemUpdateError) throw new Error(itemUpdateError.message);
+  const { count: loggedCount } = await supabase
+    .from("sets")
+    .select("*", { count: "exact", head: true })
+    .eq("exercise_id", exerciseId);
+  const itemDone = (loggedCount ?? 0) >= targetSets;
 
-  const { data: remaining } = await supabase
+  const { data: allItems } = await supabase
     .from("goal_items")
-    .select("id")
-    .eq("goal_id", goalId)
-    .is("exercise_id", null);
+    .select("id, target_sets, exercise_id")
+    .eq("goal_id", goalId);
 
   let allComplete = false;
-  if (!remaining || remaining.length === 0) {
+  if (allItems && allItems.length > 0) {
+    const exerciseIds = allItems
+      .filter((it) => it.exercise_id)
+      .map((it) => it.exercise_id as string);
+    const { data: allSets } = exerciseIds.length
+      ? await supabase.from("sets").select("exercise_id").in("exercise_id", exerciseIds)
+      : { data: [] as { exercise_id: string }[] };
+    const countsByExercise = new Map<string, number>();
+    for (const s of allSets ?? []) {
+      countsByExercise.set(s.exercise_id, (countsByExercise.get(s.exercise_id) ?? 0) + 1);
+    }
+    allComplete = allItems.every(
+      (it) => it.exercise_id && (countsByExercise.get(it.exercise_id) ?? 0) >= it.target_sets
+    );
+  }
+
+  if (allComplete) {
     await supabase
       .from("daily_goals")
       .update({ completed_at: new Date().toISOString() })
       .eq("id", goalId);
-    allComplete = true;
   }
 
   revalidatePath("/");
   revalidatePath(`/workouts/${workout.id}`);
-  return { allComplete, workoutId: workout.id as string };
+  return { itemDone, allComplete, workoutId: workout.id as string };
+}
+
+export async function updateGoalSet(setId: string, input: SetInput) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from("sets")
+    .update({ reps: input.reps, weight: input.weight, weight_unit: input.weightUnit })
+    .eq("id", setId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/");
 }

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import confetti from "canvas-confetti";
-import { completeGoalItem } from "@/app/actions";
+import { logGoalSet, updateGoalSet } from "@/app/actions";
 import { exerciseEmoji } from "@/lib/exerciseEmoji";
 
 type GoalItem = {
@@ -14,65 +15,46 @@ type GoalItem = {
   exerciseId: string | null;
 };
 
+type LoggedSet = {
+  id: string;
+  setNumber: number;
+  reps: number;
+  weight: number;
+  weightUnit: "lbs" | "kg";
+};
+
 type Suggestion = { weight: number; unit: "lbs" | "kg" } | null;
 
 export function DailyGoalCard({
   goalId,
   items,
+  loggedSetsByExercise,
   suggestions,
   alreadyComplete,
 }: {
   goalId: string;
   items: GoalItem[];
+  loggedSetsByExercise: Record<string, LoggedSet[]>;
   suggestions: Record<string, Suggestion>;
   alreadyComplete: boolean;
 }) {
   const router = useRouter();
   const [openItemId, setOpenItemId] = useState<string | null>(null);
-  const [reps, setReps] = useState(0);
-  const [weight, setWeight] = useState(0);
-  const [unit, setUnit] = useState<"lbs" | "kg">("lbs");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const completedCount = items.filter((it) => it.exerciseId).length;
+  const itemLoggedCount = (item: GoalItem) =>
+    item.exerciseId ? (loggedSetsByExercise[item.exerciseId]?.length ?? 0) : 0;
+  const itemDone = (item: GoalItem) => itemLoggedCount(item) >= item.targetSets;
 
-  function openItem(item: GoalItem) {
-    const suggestion = suggestions[item.exerciseName];
-    setReps(item.targetReps);
-    setWeight(suggestion?.weight ?? 0);
-    setUnit(suggestion?.unit ?? "lbs");
-    setOpenItemId(item.id);
-    setError(null);
-  }
+  const completedCount = items.filter(itemDone).length;
 
-  async function handleComplete(item: GoalItem) {
-    if (reps <= 0 && weight <= 0) {
-      setError("Enter reps and weight.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await completeGoalItem(goalId, item.id, item.exerciseName, item.targetSets, {
-        reps,
-        weight,
-        weightUnit: unit,
+  function celebrateIfNeeded(allComplete: boolean) {
+    if (allComplete && !alreadyComplete) {
+      confetti({
+        particleCount: 140,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ["#6c5ce7", "#d97a2e", "#f3f1fb"],
       });
-      setOpenItemId(null);
-      setSaving(false);
-      if (result.allComplete && !alreadyComplete) {
-        confetti({
-          particleCount: 140,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ["#6c5ce7", "#d97a2e", "#f3f1fb"],
-        });
-      }
-      router.refresh();
-    } catch (err) {
-      setSaving(false);
-      setError(err instanceof Error ? err.message : "Failed to log");
     }
   }
 
@@ -87,81 +69,207 @@ export function DailyGoalCard({
 
       <div className="flex flex-col gap-2">
         {items.map((item) => {
-          const done = !!item.exerciseId;
+          const done = itemDone(item);
+          const loggedSets = item.exerciseId ? (loggedSetsByExercise[item.exerciseId] ?? []) : [];
           const isOpen = openItemId === item.id;
           return (
             <div key={item.id} className="rounded-lg border border-border overflow-hidden">
               <button
                 type="button"
-                onClick={() => (done ? undefined : isOpen ? setOpenItemId(null) : openItem(item))}
-                disabled={done}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-left disabled:opacity-70"
+                onClick={() => setOpenItemId(isOpen ? null : item.id)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
               >
                 <span className="text-lg">{exerciseEmoji(item.exerciseName)}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.exerciseName}</p>
                   <p className="text-xs text-text-muted">
-                    Target: {item.targetSets} × {item.targetReps} reps
+                    {loggedSets.length}/{item.targetSets} sets × {item.targetReps} reps
                   </p>
                 </div>
                 {done ? (
-                  <span className="text-accent-orange text-lg">✓</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-accent-orange text-lg">✓</span>
+                    <span className="text-text-muted text-xs underline">Edit</span>
+                  </span>
                 ) : (
                   <span className="text-text-muted text-xs">Log</span>
                 )}
               </button>
 
-              {isOpen && !done && (
-                <div className="px-3 pb-3 flex flex-col gap-2 border-t border-border pt-2">
-                  {suggestions[item.exerciseName] && (
-                    <p className="text-xs text-text-muted">
-                      Suggested: {suggestions[item.exerciseName]!.weight}{" "}
-                      {suggestions[item.exerciseName]!.unit}
-                    </p>
-                  )}
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="Reps"
-                      value={reps || ""}
-                      onChange={(e) => setReps(Number(e.target.value))}
-                      className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.5"
-                      placeholder="Weight"
-                      value={weight || ""}
-                      onChange={(e) => setWeight(Number(e.target.value))}
-                      className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
-                    />
-                    <select
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value as "lbs" | "kg")}
-                      className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
-                    >
-                      <option value="lbs">lbs</option>
-                      <option value="kg">kg</option>
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleComplete(item)}
-                    disabled={saving}
-                    className="bg-gradient-to-r from-accent-purple to-accent-purple-2 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-50"
-                  >
-                    {saving ? "Saving…" : "Mark complete"}
-                  </button>
-                </div>
+              {isOpen && (
+                <SetLogger
+                  goalId={goalId}
+                  item={item}
+                  loggedSets={loggedSets}
+                  suggestion={suggestions[item.exerciseName] ?? null}
+                  onAllComplete={celebrateIfNeeded}
+                  onRefresh={() => router.refresh()}
+                />
               )}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
 
+function SetLogger({
+  goalId,
+  item,
+  loggedSets,
+  suggestion,
+  onAllComplete,
+  onRefresh,
+}: {
+  goalId: string;
+  item: GoalItem;
+  loggedSets: LoggedSet[];
+  suggestion: Suggestion;
+  onAllComplete: (allComplete: boolean) => void;
+  onRefresh: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [savingSet, setSavingSet] = useState<number | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const setsByNumber = new Map(loggedSets.map((s) => [s.setNumber, s]));
+
+  async function handleLog(setNumber: number, reps: number, weight: number, unit: "lbs" | "kg") {
+    if (reps <= 0 && weight <= 0) {
+      setError("Enter reps and weight.");
+      return;
+    }
+    setError(null);
+    setSavingSet(setNumber);
+    try {
+      const result = await logGoalSet(goalId, item.id, item.exerciseName, item.targetSets, setNumber, {
+        reps,
+        weight,
+        weightUnit: unit,
+      });
+      setSavingSet(null);
+      onAllComplete(result.allComplete);
+      onRefresh();
+    } catch (err) {
+      setSavingSet(null);
+      setError(err instanceof Error ? err.message : "Failed to log");
+    }
+  }
+
+  function handleEdit(setId: string, reps: number, weight: number, unit: "lbs" | "kg") {
+    startTransition(async () => {
+      try {
+        await updateGoalSet(setId, { reps, weight, weightUnit: unit });
+        onRefresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update");
+      }
+    });
+  }
+
+  return (
+    <div className="px-3 pb-3 flex flex-col gap-3 border-t border-border pt-2">
+      {suggestion && (
+        <p className="text-xs text-text-muted">
+          Suggested: {suggestion.weight} {suggestion.unit}
+        </p>
+      )}
+      {Array.from({ length: item.targetSets }, (_, i) => i + 1).map((setNumber) => {
+        const logged = setsByNumber.get(setNumber);
+        return (
+          <SetRow
+            key={setNumber}
+            setNumber={setNumber}
+            logged={logged}
+            defaultReps={item.targetReps}
+            defaultWeight={suggestion?.weight ?? 0}
+            defaultUnit={suggestion?.unit ?? "lbs"}
+            saving={savingSet === setNumber || (isPending && !!logged)}
+            onLog={(reps, weight, unit) => handleLog(setNumber, reps, weight, unit)}
+            onEdit={
+              logged ? (reps, weight, unit) => handleEdit(logged.id, reps, weight, unit) : undefined
+            }
+          />
+        );
+      })}
       {error && <p className="text-sm text-danger">{error}</p>}
+    </div>
+  );
+}
+
+function SetRow({
+  setNumber,
+  logged,
+  defaultReps,
+  defaultWeight,
+  defaultUnit,
+  saving,
+  onLog,
+  onEdit,
+}: {
+  setNumber: number;
+  logged: LoggedSet | undefined;
+  defaultReps: number;
+  defaultWeight: number;
+  defaultUnit: "lbs" | "kg";
+  saving: boolean;
+  onLog: (reps: number, weight: number, unit: "lbs" | "kg") => void;
+  onEdit?: (reps: number, weight: number, unit: "lbs" | "kg") => void;
+}) {
+  const [reps, setReps] = useState(logged?.reps ?? defaultReps);
+  const [weight, setWeight] = useState(logged?.weight ?? defaultWeight);
+  const [unit, setUnit] = useState<"lbs" | "kg">(logged?.weightUnit ?? defaultUnit);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-text-muted">Set {setNumber}</span>
+        {logged && <span className="text-accent-orange text-xs">✓ logged</span>}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <input
+          type="number"
+          min={0}
+          placeholder="Reps"
+          value={reps || ""}
+          onChange={(e) => setReps(Number(e.target.value))}
+          onBlur={() => onEdit && onEdit(reps, weight, unit)}
+          className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.5"
+          placeholder="Weight"
+          value={weight || ""}
+          onChange={(e) => setWeight(Number(e.target.value))}
+          onBlur={() => onEdit && onEdit(reps, weight, unit)}
+          className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+        />
+        <select
+          value={unit}
+          onChange={(e) => {
+            const next = e.target.value as "lbs" | "kg";
+            setUnit(next);
+            if (onEdit) onEdit(reps, weight, next);
+          }}
+          className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+        >
+          <option value="lbs">lbs</option>
+          <option value="kg">kg</option>
+        </select>
+      </div>
+      {!logged && (
+        <button
+          type="button"
+          onClick={() => onLog(reps, weight, unit)}
+          disabled={saving}
+          className="bg-gradient-to-r from-accent-purple to-accent-purple-2 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Log set"}
+        </button>
+      )}
     </div>
   );
 }

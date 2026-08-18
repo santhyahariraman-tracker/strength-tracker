@@ -1,15 +1,22 @@
 const EMOJI_RULES: [RegExp, string][] = [
-  [/bench|press|chest|push.?up/i, "🏋️"],
-  [/squat|leg|lunge|calf/i, "🦵"],
+  // Specific leg exercises first, so they don't collapse onto one generic icon.
+  [/goblet/i, "🏺"],
+  [/leg.?press/i, "🦵"],
+  [/leg.?extension/i, "🦿"],
+  [/lunge/i, "🤸"],
+  [/split.?squat/i, "🤺"],
+  [/squat/i, "🏋️‍♀️"],
+  [/calf/i, "🦶"],
   [/deadlift/i, "🏋️‍♂️"],
+  [/bench|chest|push.?up/i, "🏋️"],
   [/run|sprint|treadmill/i, "🏃"],
   [/bike|cycle|spin/i, "🚴"],
-  [/row|rowing/i, "🚣"],
+  [/row(ing)?\b/i, "🚣"],
   [/pull.?up|pulldown|lat|climb/i, "🧗"],
   [/curl|bicep|tricep|arm/i, "💪"],
   [/yoga|stretch|mobility/i, "🧘"],
-  [/plank|core|ab(s)?\b/i, "🔥"],
-  [/shoulder|delt/i, "🏋️"],
+  [/plank|core|\bab(s)?\b/i, "🔥"],
+  [/shoulder|delt|press/i, "🏋️"],
   [/swim/i, "🏊"],
 ];
 

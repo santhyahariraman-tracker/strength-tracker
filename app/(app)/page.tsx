@@ -129,6 +129,33 @@ export default async function DashboardPage({
   }
   const todayRoutine = routines.find((r) => r.dayOfWeek === now.getDay()) ?? null;
 
+  // --- Sets already logged today for each goal item, keyed by exercise id ---
+  const goalSetsByExercise: Record<
+    string,
+    { id: string; setNumber: number; reps: number; weight: number; weightUnit: "lbs" | "kg" }[]
+  > = {};
+  if (todayGoal) {
+    const exerciseIds = todayGoal.items
+      .filter((it) => it.exerciseId)
+      .map((it) => it.exerciseId as string);
+    if (exerciseIds.length > 0) {
+      const { data: loggedSets } = await supabase
+        .from("sets")
+        .select("id, exercise_id, set_number, reps, weight, weight_unit")
+        .in("exercise_id", exerciseIds)
+        .order("set_number", { ascending: true });
+      for (const s of loggedSets ?? []) {
+        (goalSetsByExercise[s.exercise_id] ??= []).push({
+          id: s.id,
+          setNumber: s.set_number,
+          reps: s.reps,
+          weight: s.weight,
+          weightUnit: s.weight_unit,
+        });
+      }
+    }
+  }
+
   const { data: exs } = await supabase.from("exercises").select("name");
   const exerciseSuggestions = [...new Set((exs ?? []).map((e) => e.name))];
 
@@ -241,6 +268,7 @@ export default async function DashboardPage({
           <DailyGoalCard
             goalId={todayGoal.id}
             items={todayGoal.items}
+            loggedSetsByExercise={goalSetsByExercise}
             suggestions={suggestions}
             alreadyComplete={!!todayGoal.completed_at}
           />
