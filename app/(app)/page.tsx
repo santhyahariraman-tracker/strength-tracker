@@ -1,12 +1,38 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { MonthNav } from "@/components/MonthNav";
 
-export default async function DashboardPage() {
+function parseMonthParam(param: string | undefined): { year: number; month: number } {
+  if (param && /^\d{4}-\d{2}$/.test(param)) {
+    const [y, m] = param.split("-").map(Number);
+    return { year: y, month: m - 1 };
+  }
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() };
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   const supabase = await createClient();
+  const { month: monthParam } = await searchParams;
+  const { year, month } = parseMonthParam(monthParam);
+
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 1);
+  const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+
+  const { count: totalWorkoutCount } = await supabase
+    .from("workouts")
+    .select("id", { count: "exact", head: true });
 
   const { data: workouts, error } = await supabase
     .from("workouts")
     .select("id, workout_date, focus, exercises(count)")
+    .gte("workout_date", toISODate(monthStart))
+    .lt("workout_date", toISODate(monthEnd))
     .order("workout_date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -21,19 +47,21 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-5 pt-2">
+      <MonthNav />
+
       <div className="rounded-2xl p-5 bg-gradient-to-br from-accent-purple to-accent-purple-2 shadow-lg">
         <p className="text-xs font-semibold tracking-wide text-white/70 uppercase">
-          {now.toLocaleDateString(undefined, { weekday: "long" })} · Today
+          {now.toLocaleDateString("en-US", { weekday: "long" })} · Today
         </p>
         <p className="text-2xl font-bold text-white mt-1">
-          {now.toLocaleDateString(undefined, {
+          {now.toLocaleDateString("en-US", {
             month: "long",
             day: "numeric",
             year: "numeric",
           })}
         </p>
         <p className="text-sm text-white/80 mt-2">
-          {workouts?.length ?? 0} workout{workouts?.length === 1 ? "" : "s"} logged
+          {totalWorkoutCount ?? 0} workout{totalWorkoutCount === 1 ? "" : "s"} logged
           total
         </p>
       </div>
@@ -62,7 +90,7 @@ export default async function DashboardPage() {
       {workouts && workouts.length === 0 && (
         <div className="rounded-xl border border-border bg-surface px-4 py-6 text-center">
           <p className="text-sm text-text-muted">
-            No workouts logged yet. Tap “+ New” to add your first one.
+            No workouts logged this month. Tap “+ New” to add one.
           </p>
         </div>
       )}
@@ -108,7 +136,7 @@ export default async function DashboardPage() {
 function formatDate(dateStr: string) {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

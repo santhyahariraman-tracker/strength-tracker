@@ -44,6 +44,25 @@ function PlusIcon({ active }: { active: boolean }) {
   );
 }
 
+function ChartIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? "var(--accent-orange)" : "var(--text-muted)"}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 20V10" />
+      <path d="M12 20V4" />
+      <path d="M20 20v-6" />
+    </svg>
+  );
+}
+
 function SignOutIcon() {
   return (
     <svg
@@ -67,10 +86,11 @@ export function BottomNav() {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isNew = pathname === "/workouts/new";
+  const isReports = pathname === "/reports";
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-surface/95 backdrop-blur">
-      <div className="max-w-md mx-auto grid grid-cols-3 items-center px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+      <div className="max-w-md mx-auto grid grid-cols-4 items-center px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <Link
           href="/"
           className="flex flex-col items-center gap-1 py-1 rounded-lg"
@@ -94,6 +114,19 @@ export function BottomNav() {
             style={{ color: isNew ? "var(--accent-orange)" : "var(--text-muted)" }}
           >
             New
+          </span>
+        </Link>
+
+        <Link
+          href="/reports"
+          className="flex flex-col items-center gap-1 py-1 rounded-lg"
+        >
+          <ChartIcon active={isReports} />
+          <span
+            className="text-[11px] font-medium"
+            style={{ color: isReports ? "var(--accent-orange)" : "var(--text-muted)" }}
+          >
+            Reports
           </span>
         </Link>
 
