@@ -10,13 +10,33 @@ export default async function WorkoutPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: workout } = await supabase
-    .from("workouts")
-    .select(
-      "id, workout_date, focus, exercises(id, name, position, sets(id, set_number, reps, weight, weight_unit))"
-    )
-    .eq("id", id)
-    .single();
+  let workout = (
+    await supabase
+      .from("workouts")
+      .select(
+        "id, workout_date, focus, exercises(id, name, position, notes, sets(id, set_number, reps, weight, weight_unit))"
+      )
+      .eq("id", id)
+      .single()
+  ).data;
+
+  // `notes` ships in a migration the user applies manually; fall back to a
+  // query without it so the page still works before that migration runs.
+  if (!workout) {
+    const fallback = await supabase
+      .from("workouts")
+      .select(
+        "id, workout_date, focus, exercises(id, name, position, sets(id, set_number, reps, weight, weight_unit))"
+      )
+      .eq("id", id)
+      .single();
+    if (fallback.data) {
+      workout = {
+        ...fallback.data,
+        exercises: fallback.data.exercises.map((ex) => ({ ...ex, notes: null })),
+      };
+    }
+  }
 
   if (!workout) notFound();
 

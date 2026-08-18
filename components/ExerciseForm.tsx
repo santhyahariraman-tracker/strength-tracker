@@ -6,6 +6,7 @@ import type { SetInput } from "@/app/actions";
 export type ExerciseDraft = {
   name: string;
   sets: SetInput[];
+  notes?: string;
 };
 
 export function emptySet(unit: "lbs" | "kg" = "lbs"): SetInput {
@@ -115,6 +116,14 @@ export function ExerciseFormFields({
           ))}
         </div>
       )}
+
+      <textarea
+        placeholder="Notes (optional) — e.g. felt heavy today"
+        value={exercise.notes ?? ""}
+        onChange={(e) => onChange({ ...exercise, notes: e.target.value })}
+        rows={2}
+        className="border rounded-lg px-3 py-2 text-sm resize-none"
+      />
     </div>
   );
 }

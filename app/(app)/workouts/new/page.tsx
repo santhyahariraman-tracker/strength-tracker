@@ -64,6 +64,7 @@ export default function NewWorkoutPage() {
       .map((ex) => ({
         name: ex.name.trim(),
         sets: ex.sets.filter((s) => s.reps > 0 || s.weight > 0),
+        notes: ex.notes?.trim() || undefined,
       }));
 
     if (cleanExercises.length === 0) {

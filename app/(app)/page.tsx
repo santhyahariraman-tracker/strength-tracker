@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { MonthNav } from "@/components/MonthNav";
+import { exerciseEmoji } from "@/lib/exerciseEmoji";
 
 function parseMonthParam(param: string | undefined): { year: number; month: number } {
   if (param && /^\d{4}-\d{2}$/.test(param)) {
@@ -30,7 +31,7 @@ export default async function DashboardPage({
 
   const { data: workouts, error } = await supabase
     .from("workouts")
-    .select("id, workout_date, focus, exercises(count)")
+    .select("id, workout_date, focus, exercises(name, position)")
     .gte("workout_date", toISODate(monthStart))
     .lt("workout_date", toISODate(monthEnd))
     .order("workout_date", { ascending: false })
@@ -96,20 +97,23 @@ export default async function DashboardPage({
       )}
 
       <ul className="flex flex-col gap-2.5">
-        {workouts?.map((w) => (
+        {workouts?.map((w) => {
+          const sortedExercises = [...w.exercises].sort((a, b) => a.position - b.position);
+          const icon = sortedExercises[0] ? exerciseEmoji(sortedExercises[0].name) : "💪";
+          return (
           <li key={w.id}>
             <Link
               href={`/workouts/${w.id}`}
               className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 active:bg-surface-2"
             >
               <div className="w-10 h-10 shrink-0 rounded-lg bg-surface-2 flex items-center justify-center text-lg">
-                💪
+                {icon}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{w.focus}</p>
                 <p className="text-xs text-text-muted mt-0.5">
-                  {formatDate(w.workout_date)} · {w.exercises?.[0]?.count ?? 0} exercise
-                  {(w.exercises?.[0]?.count ?? 0) === 1 ? "" : "s"}
+                  {formatDate(w.workout_date)} · {w.exercises.length} exercise
+                  {w.exercises.length === 1 ? "" : "s"}
                 </p>
               </div>
               <svg
@@ -127,7 +131,8 @@ export default async function DashboardPage({
               </svg>
             </Link>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );

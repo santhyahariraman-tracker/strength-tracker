@@ -19,6 +19,26 @@ async function requireUser() {
   return { supabase, user };
 }
 
+function isMissingNotesColumn(message: string) {
+  return message.includes("notes") && /column|schema cache/i.test(message);
+}
+
+// The `notes` column ships in a migration the user applies manually (see
+// supabase/migrations/0002_add_exercise_notes.sql). Until they run it, retry
+// without `notes` so exercise creation still works.
+async function insertExerciseRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  row: { workout_id: string; name: string; position: number; notes: string | null }
+) {
+  const first = await supabase.from("exercises").insert(row).select().single();
+  if (!first.error) return first;
+  if (isMissingNotesColumn(first.error.message)) {
+    const { notes: _notes, ...withoutNotes } = row;
+    return supabase.from("exercises").insert(withoutNotes).select().single();
+  }
+  return first;
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
@@ -28,7 +48,7 @@ export async function signOut() {
 export async function createWorkout(input: {
   date: string;
   focus: string;
-  exercises: { name: string; sets: SetInput[] }[];
+  exercises: { name: string; sets: SetInput[]; notes?: string }[];
 }) {
   const { supabase, user } = await requireUser();
 
@@ -42,11 +62,12 @@ export async function createWorkout(input: {
 
   for (let i = 0; i < input.exercises.length; i++) {
     const ex = input.exercises[i];
-    const { data: exercise, error: exerciseError } = await supabase
-      .from("exercises")
-      .insert({ workout_id: workout.id, name: ex.name, position: i })
-      .select()
-      .single();
+    const { data: exercise, error: exerciseError } = await insertExerciseRow(supabase, {
+      workout_id: workout.id,
+      name: ex.name,
+      position: i,
+      notes: ex.notes || null,
+    });
 
     if (exerciseError) throw new Error(exerciseError.message);
 
@@ -91,7 +112,7 @@ export async function updateWorkout(
 
 export async function addExercise(
   workoutId: string,
-  input: { name: string; sets: SetInput[] }
+  input: { name: string; sets: SetInput[]; notes?: string }
 ) {
   const { supabase } = await requireUser();
 
@@ -100,11 +121,12 @@ export async function addExercise(
     .select("*", { count: "exact", head: true })
     .eq("workout_id", workoutId);
 
-  const { data: exercise, error: exerciseError } = await supabase
-    .from("exercises")
-    .insert({ workout_id: workoutId, name: input.name, position: count ?? 0 })
-    .select()
-    .single();
+  const { data: exercise, error: exerciseError } = await insertExerciseRow(supabase, {
+    workout_id: workoutId,
+    name: input.name,
+    position: count ?? 0,
+    notes: input.notes || null,
+  });
 
   if (exerciseError) throw new Error(exerciseError.message);
 
@@ -121,6 +143,20 @@ export async function addExercise(
     if (setsError) throw new Error(setsError.message);
   }
 
+  revalidatePath(`/workouts/${workoutId}`);
+}
+
+export async function updateExerciseNotes(
+  workoutId: string,
+  exerciseId: string,
+  notes: string
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from("exercises")
+    .update({ notes: notes || null })
+    .eq("id", exerciseId);
+  if (error && !isMissingNotesColumn(error.message)) throw new Error(error.message);
   revalidatePath(`/workouts/${workoutId}`);
 }
 

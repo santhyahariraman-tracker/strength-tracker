@@ -8,10 +8,12 @@ import {
   deleteExercise,
   deleteSet,
   deleteWorkout,
+  updateExerciseNotes,
   updateSet,
   updateWorkout,
 } from "@/app/actions";
 import { ExerciseFormFields, emptySet, type ExerciseDraft } from "@/components/ExerciseForm";
+import { exerciseEmoji } from "@/lib/exerciseEmoji";
 
 type SetRow = {
   id: string;
@@ -25,6 +27,7 @@ type ExerciseRow = {
   id: string;
   name: string;
   position: number;
+  notes: string | null;
   sets: SetRow[];
 };
 
@@ -82,7 +85,7 @@ export function WorkoutDetail({
     }
     startTransition(async () => {
       try {
-        await addExercise(workout.id, { name, sets });
+        await addExercise(workout.id, { name, sets, notes: draft.notes?.trim() || undefined });
         setDraft({ name: "", sets: [emptySet()] });
         setAddingExercise(false);
         router.refresh();
@@ -202,6 +205,14 @@ function ExerciseCard({
   const [isPending, startTransition] = useTransition();
   const [newSet, setNewSet] = useState(emptySet());
   const [adding, setAdding] = useState(false);
+  const [notes, setNotes] = useState(exercise.notes ?? "");
+
+  function handleNotesBlur() {
+    if (notes === (exercise.notes ?? "")) return;
+    startTransition(async () => {
+      await updateExerciseNotes(workoutId, exercise.id, notes.trim());
+    });
+  }
 
   function handleDeleteExercise() {
     if (!confirm(`Remove ${exercise.name} and all its sets?`)) return;
@@ -241,7 +252,10 @@ function ExerciseCard({
   return (
     <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium">{exercise.name}</h3>
+        <h3 className="font-medium flex items-center gap-2">
+          <span>{exerciseEmoji(exercise.name)}</span>
+          {exercise.name}
+        </h3>
         <button
           type="button"
           onClick={handleDeleteExercise}
@@ -295,6 +309,15 @@ function ExerciseCard({
           </div>
         ))}
       </div>
+
+      <textarea
+        placeholder="Notes (optional) — e.g. felt heavy today"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        onBlur={handleNotesBlur}
+        rows={2}
+        className="border rounded-lg px-3 py-2 text-sm resize-none"
+      />
 
       {adding ? (
         <div className="flex flex-col gap-1.5">

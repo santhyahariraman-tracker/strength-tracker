@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { exerciseEmoji } from "@/lib/exerciseEmoji";
 import {
   Bar,
   BarChart,
@@ -288,7 +289,10 @@ export function Reports({ workouts }: { workouts: WorkoutRow[] }) {
                 key={rec.name}
                 className="rounded-xl border border-border bg-surface px-4 py-3"
               >
-                <p className="font-medium text-sm">{rec.name}</p>
+                <p className="font-medium text-sm flex items-center gap-1.5">
+                  <span>{exerciseEmoji(rec.name)}</span>
+                  {rec.name}
+                </p>
                 <div className="flex justify-between mt-1 text-xs text-text-muted">
                   <span>
                     Best weight: <span className="text-text">{rec.maxWeight} {unit}</span>
