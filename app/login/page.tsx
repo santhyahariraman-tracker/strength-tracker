@@ -46,12 +46,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4">
+    <div className="flex flex-1 items-center justify-center px-5 bg-bg min-h-screen">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold mb-1">Strength Tracker</h1>
-        <p className="text-sm text-neutral-500 mb-6">
-          {mode === "sign-in" ? "Sign in to your account" : "Create an account"}
-        </p>
+        <div className="text-center mb-8">
+          <span className="text-4xl">🏋️</span>
+          <h1 className="text-2xl font-bold mt-3">Strength Tracker</h1>
+          <p className="text-sm text-text-muted mt-1">
+            {mode === "sign-in" ? "Sign in to your account" : "Create an account"}
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
@@ -60,7 +63,7 @@ export default function LoginPage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm"
+            className="border rounded-xl px-4 py-3 text-sm"
           />
           <input
             type="password"
@@ -69,16 +72,16 @@ export default function LoginPage() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm"
+            className="border rounded-xl px-4 py-3 text-sm"
           />
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {message && <p className="text-sm text-green-600">{message}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
+          {message && <p className="text-sm text-emerald-400">{message}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="bg-neutral-900 text-white rounded-md py-2 text-sm font-medium disabled:opacity-50"
+            className="bg-gradient-to-r from-accent-purple to-accent-purple-2 text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50 mt-1"
           >
             {loading
               ? "Please wait…"
@@ -95,7 +98,7 @@ export default function LoginPage() {
             setMessage(null);
             setMode(mode === "sign-in" ? "sign-up" : "sign-in");
           }}
-          className="mt-4 text-sm text-neutral-500 underline"
+          className="mt-5 text-sm text-text-muted underline block mx-auto"
         >
           {mode === "sign-in"
             ? "Need an account? Sign up"

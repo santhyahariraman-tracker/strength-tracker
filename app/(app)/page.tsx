@@ -10,41 +10,93 @@ export default async function DashboardPage() {
     .order("workout_date", { ascending: false })
     .order("created_at", { ascending: false });
 
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const thisWeekCount =
+    workouts?.filter((w) => new Date(w.workout_date + "T00:00:00") >= startOfWeek)
+      .length ?? 0;
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">Your workouts</h1>
+    <div className="flex flex-col gap-5 pt-2">
+      <div className="rounded-2xl p-5 bg-gradient-to-br from-accent-purple to-accent-purple-2 shadow-lg">
+        <p className="text-xs font-semibold tracking-wide text-white/70 uppercase">
+          {now.toLocaleDateString(undefined, { weekday: "long" })} · Today
+        </p>
+        <p className="text-2xl font-bold text-white mt-1">
+          {now.toLocaleDateString(undefined, {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </p>
+        <p className="text-sm text-white/80 mt-2">
+          {workouts?.length ?? 0} workout{workouts?.length === 1 ? "" : "s"} logged
+          total
+        </p>
+      </div>
+
+      <div className="rounded-xl px-4 py-3 bg-gradient-to-r from-accent-orange to-accent-orange-2 flex items-center gap-2 shadow">
+        <span>🔥</span>
+        <p className="text-sm font-medium text-white">
+          {thisWeekCount} workout{thisWeekCount === 1 ? "" : "s"} logged this week
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold tracking-widest text-text-muted uppercase">
+          Workouts
+        </h2>
         <Link
           href="/workouts/new"
-          className="bg-neutral-900 text-white rounded-md px-4 py-2 text-sm font-medium"
+          className="text-xs font-medium text-accent-orange"
         >
-          + New workout
+          + New
         </Link>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error.message}</p>}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
 
       {workouts && workouts.length === 0 && (
-        <p className="text-sm text-neutral-500">
-          No workouts logged yet. Start by adding your first one.
-        </p>
+        <div className="rounded-xl border border-border bg-surface px-4 py-6 text-center">
+          <p className="text-sm text-text-muted">
+            No workouts logged yet. Tap “+ New” to add your first one.
+          </p>
+        </div>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2.5">
         {workouts?.map((w) => (
           <li key={w.id}>
             <Link
               href={`/workouts/${w.id}`}
-              className="flex items-center justify-between border rounded-md px-4 py-3 hover:bg-neutral-50"
+              className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 active:bg-surface-2"
             >
-              <div>
-                <p className="font-medium">{formatDate(w.workout_date)}</p>
-                <p className="text-sm text-neutral-500">{w.focus}</p>
+              <div className="w-10 h-10 shrink-0 rounded-lg bg-surface-2 flex items-center justify-center text-lg">
+                💪
               </div>
-              <span className="text-sm text-neutral-400">
-                {w.exercises?.[0]?.count ?? 0} exercise
-                {(w.exercises?.[0]?.count ?? 0) === 1 ? "" : "s"}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{w.focus}</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {formatDate(w.workout_date)} · {w.exercises?.[0]?.count ?? 0} exercise
+                  {(w.exercises?.[0]?.count ?? 0) === 1 ? "" : "s"}
+                </p>
+              </div>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--text-muted)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
             </Link>
           </li>
         ))}
@@ -58,7 +110,6 @@ function formatDate(dateStr: string) {
   const date = new Date(year, month - 1, day);
   return date.toLocaleDateString(undefined, {
     weekday: "short",
-    year: "numeric",
     month: "short",
     day: "numeric",
   });

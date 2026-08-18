@@ -1,35 +1,18 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions";
+import { BottomNav } from "@/components/BottomNav";
 
-export default async function AppLayout({
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   return (
-    <div className="flex flex-col flex-1">
-      <header className="border-b">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="font-semibold">
-            Strength Tracker
-          </Link>
-          <div className="flex items-center gap-3 text-sm text-neutral-500">
-            {user?.email && <span className="hidden sm:inline">{user.email}</span>}
-            <form action={signOut}>
-              <button className="underline" type="submit">
-                Sign out
-              </button>
-            </form>
-          </div>
-        </div>
+    <div className="flex flex-col flex-1 w-full max-w-md mx-auto min-h-screen">
+      <header className="flex items-center gap-2 px-5 pt-6 pb-2">
+        <span className="text-xl">🏋️</span>
+        <h1 className="text-lg font-semibold tracking-tight">Strength Tracker</h1>
       </header>
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-6">{children}</main>
+      <main className="flex-1 px-4 pb-28">{children}</main>
+      <BottomNav />
     </div>
   );
 }

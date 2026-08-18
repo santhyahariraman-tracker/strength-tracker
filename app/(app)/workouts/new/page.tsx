@@ -73,7 +73,13 @@ export default function NewWorkoutPage() {
 
     setSaving(true);
     try {
-      await createWorkout({ date, focus: focus.trim(), exercises: cleanExercises });
+      const { id } = await createWorkout({
+        date,
+        focus: focus.trim(),
+        exercises: cleanExercises,
+      });
+      router.push(`/workouts/${id}`);
+      router.refresh();
     } catch (err) {
       setSaving(false);
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -81,31 +87,31 @@ export default function NewWorkoutPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5 pt-2">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">New workout</h1>
+        <h1 className="text-lg font-semibold">New workout</h1>
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="text-sm text-neutral-500 underline"
+          className="text-sm text-text-muted underline"
         >
           Cancel
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <label className="flex flex-col gap-1 text-sm flex-1">
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-sm">
             Date
             <input
               type="date"
               required
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="border rounded-md px-3 py-2"
+              className="border rounded-lg px-3 py-2.5"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm flex-1">
+          <label className="flex flex-col gap-1 text-sm">
             Focus
             <input
               list="focus-suggestions"
@@ -113,7 +119,7 @@ export default function NewWorkoutPage() {
               placeholder="e.g. Push Day, Legs, Back & Biceps"
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
-              className="border rounded-md px-3 py-2"
+              className="border rounded-lg px-3 py-2.5"
             />
             <datalist id="focus-suggestions">
               {focusSuggestions.map((f) => (
@@ -124,7 +130,9 @@ export default function NewWorkoutPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-neutral-600">Exercises</h2>
+          <h2 className="text-xs font-semibold tracking-widest text-text-muted uppercase">
+            Exercises
+          </h2>
           {exercises.map((ex, idx) => (
             <ExerciseFormFields
               key={idx}
@@ -137,18 +145,18 @@ export default function NewWorkoutPage() {
           <button
             type="button"
             onClick={addExerciseRow}
-            className="text-sm text-neutral-700 underline self-start"
+            className="text-sm text-accent-orange font-medium self-start"
           >
             + Add exercise
           </button>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
 
         <button
           type="submit"
           disabled={saving}
-          className="bg-neutral-900 text-white rounded-md py-2 text-sm font-medium disabled:opacity-50"
+          className="bg-gradient-to-r from-accent-purple to-accent-purple-2 text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save workout"}
         </button>

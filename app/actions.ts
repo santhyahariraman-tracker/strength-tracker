@@ -65,7 +65,7 @@ export async function createWorkout(input: {
   }
 
   revalidatePath("/");
-  redirect(`/workouts/${workout.id}`);
+  return { id: workout.id as string };
 }
 
 export async function deleteWorkout(workoutId: string) {
@@ -73,7 +73,6 @@ export async function deleteWorkout(workoutId: string) {
   const { error } = await supabase.from("workouts").delete().eq("id", workoutId);
   if (error) throw new Error(error.message);
   revalidatePath("/");
-  redirect("/");
 }
 
 export async function updateWorkout(

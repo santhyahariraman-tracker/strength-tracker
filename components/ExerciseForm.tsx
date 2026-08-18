@@ -39,7 +39,7 @@ export function ExerciseFormFields({
   }
 
   return (
-    <div className="border rounded-md p-4 flex flex-col gap-3">
+    <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
       <div className="flex items-start gap-2">
         <input
           list="exercise-suggestions"
@@ -47,13 +47,13 @@ export function ExerciseFormFields({
           placeholder="Exercise name, e.g. Lat Pulldown"
           value={exercise.name}
           onChange={(e) => onChange({ ...exercise, name: e.target.value })}
-          className="border rounded-md px-3 py-2 text-sm flex-1"
+          className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-0"
         />
         {onRemove && (
           <button
             type="button"
             onClick={onRemove}
-            className="text-sm text-red-600 px-2 py-2"
+            className="text-sm text-danger px-2 py-2 shrink-0"
           >
             Remove
           </button>
@@ -65,7 +65,7 @@ export function ExerciseFormFields({
         ))}
       </datalist>
 
-      <label className="text-sm text-neutral-600 flex items-center gap-2">
+      <label className="text-sm text-text-muted flex items-center gap-2">
         Number of sets
         <input
           type="number"
@@ -73,43 +73,44 @@ export function ExerciseFormFields({
           max={50}
           value={setCountInput}
           onChange={(e) => updateSetCount(e.target.value)}
-          className="border rounded-md px-2 py-1 text-sm w-20"
+          className="border rounded-lg px-2 py-1 text-sm w-16"
         />
       </label>
 
       {exercise.sets.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {exercise.sets.map((set, idx) => (
-            <div key={idx} className="flex items-center gap-2 text-sm">
-              <span className="text-neutral-400 w-14">Set {idx + 1}</span>
-              <input
-                type="number"
-                min={0}
-                placeholder="Reps"
-                value={set.reps || ""}
-                onChange={(e) => updateSet(idx, { reps: Number(e.target.value) })}
-                className="border rounded-md px-2 py-1 w-20"
-              />
-              <span className="text-neutral-400">reps</span>
-              <input
-                type="number"
-                min={0}
-                step="0.5"
-                placeholder="Weight"
-                value={set.weight || ""}
-                onChange={(e) => updateSet(idx, { weight: Number(e.target.value) })}
-                className="border rounded-md px-2 py-1 w-24"
-              />
-              <select
-                value={set.weightUnit}
-                onChange={(e) =>
-                  updateSet(idx, { weightUnit: e.target.value as "lbs" | "kg" })
-                }
-                className="border rounded-md px-2 py-1"
-              >
-                <option value="lbs">lbs</option>
-                <option value="kg">kg</option>
-              </select>
+            <div key={idx} className="flex flex-col gap-1.5">
+              <span className="text-xs text-text-muted">Set {idx + 1}</span>
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Reps"
+                  value={set.reps || ""}
+                  onChange={(e) => updateSet(idx, { reps: Number(e.target.value) })}
+                  className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  placeholder="Weight"
+                  value={set.weight || ""}
+                  onChange={(e) => updateSet(idx, { weight: Number(e.target.value) })}
+                  className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+                />
+                <select
+                  value={set.weightUnit}
+                  onChange={(e) =>
+                    updateSet(idx, { weightUnit: e.target.value as "lbs" | "kg" })
+                  }
+                  className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+                >
+                  <option value="lbs">lbs</option>
+                  <option value="kg">kg</option>
+                </select>
+              </div>
             </div>
           ))}
         </div>

@@ -64,6 +64,8 @@ export function WorkoutDetail({
     startTransition(async () => {
       try {
         await deleteWorkout(workout.id);
+        router.push("/");
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to delete");
       }
@@ -91,26 +93,26 @@ export function WorkoutDetail({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5 pt-2">
       <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="text-sm text-neutral-500 underline"
+          className="text-sm text-text-muted underline"
         >
           ← Back
         </button>
         <button
           type="button"
           onClick={handleDeleteWorkout}
-          className="text-sm text-red-600 underline"
+          className="text-sm text-danger underline"
         >
           Delete workout
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <label className="flex flex-col gap-1 text-sm flex-1">
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-sm">
           Date
           <input
             type="date"
@@ -120,10 +122,10 @@ export function WorkoutDetail({
               setHeaderSaved(false);
             }}
             onBlur={saveHeader}
-            className="border rounded-md px-3 py-2"
+            className="border rounded-lg px-3 py-2.5"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm flex-1">
+        <label className="flex flex-col gap-1 text-sm">
           Focus
           <input
             value={focus}
@@ -132,15 +134,15 @@ export function WorkoutDetail({
               setHeaderSaved(false);
             }}
             onBlur={saveHeader}
-            className="border rounded-md px-3 py-2"
+            className="border rounded-lg px-3 py-2.5"
           />
         </label>
       </div>
       {!headerSaved && !isPending && (
-        <p className="text-xs text-neutral-400 -mt-4">Saving on blur…</p>
+        <p className="text-xs text-text-muted -mt-3">Saving…</p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <div className="flex flex-col gap-4">
         {exercises.map((ex) => (
@@ -155,12 +157,12 @@ export function WorkoutDetail({
             onChange={setDraft}
             exerciseSuggestions={exerciseSuggestions}
           />
-          <div className="flex gap-3">
+          <div className="flex gap-4 items-center">
             <button
               type="button"
               onClick={handleAddExercise}
               disabled={isPending}
-              className="bg-neutral-900 text-white rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="bg-gradient-to-r from-accent-purple to-accent-purple-2 text-white rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
             >
               Save exercise
             </button>
@@ -170,7 +172,7 @@ export function WorkoutDetail({
                 setAddingExercise(false);
                 setDraft({ name: "", sets: [emptySet()] });
               }}
-              className="text-sm text-neutral-500 underline"
+              className="text-sm text-text-muted underline"
             >
               Cancel
             </button>
@@ -180,7 +182,7 @@ export function WorkoutDetail({
         <button
           type="button"
           onClick={() => setAddingExercise(true)}
-          className="text-sm text-neutral-700 underline self-start"
+          className="text-sm text-accent-orange font-medium self-start"
         >
           + Add exercise
         </button>
@@ -237,105 +239,109 @@ function ExerciseCard({
   }
 
   return (
-    <div className="border rounded-md p-4 flex flex-col gap-3">
+    <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h3 className="font-medium">{exercise.name}</h3>
         <button
           type="button"
           onClick={handleDeleteExercise}
-          className="text-sm text-red-600"
+          className="text-sm text-danger"
         >
           Remove
         </button>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {exercise.sets.map((set) => (
-          <div key={set.id} className="flex items-center gap-2 text-sm">
-            <span className="text-neutral-400 w-14">Set {set.set_number}</span>
-            <input
-              type="number"
-              min={0}
-              defaultValue={set.reps}
-              onBlur={(e) => handleSetChange(set.id, { reps: Number(e.target.value) })}
-              className="border rounded-md px-2 py-1 w-20"
-            />
-            <span className="text-neutral-400">reps</span>
-            <input
-              type="number"
-              min={0}
-              step="0.5"
-              defaultValue={set.weight}
-              onBlur={(e) => handleSetChange(set.id, { weight: Number(e.target.value) })}
-              className="border rounded-md px-2 py-1 w-24"
-            />
-            <select
-              defaultValue={set.weight_unit}
-              onChange={(e) =>
-                handleSetChange(set.id, { weight_unit: e.target.value as "lbs" | "kg" })
-              }
-              className="border rounded-md px-2 py-1"
-            >
-              <option value="lbs">lbs</option>
-              <option value="kg">kg</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => handleDeleteSet(set.id)}
-              className="text-neutral-400 hover:text-red-600 text-xs ml-1"
-              disabled={isPending}
-            >
-              ✕
-            </button>
+          <div key={set.id} className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-muted">Set {set.set_number}</span>
+              <button
+                type="button"
+                onClick={() => handleDeleteSet(set.id)}
+                className="text-text-muted text-xs"
+                disabled={isPending}
+              >
+                Remove
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="number"
+                min={0}
+                defaultValue={set.reps}
+                onBlur={(e) => handleSetChange(set.id, { reps: Number(e.target.value) })}
+                className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+              />
+              <input
+                type="number"
+                min={0}
+                step="0.5"
+                defaultValue={set.weight}
+                onBlur={(e) => handleSetChange(set.id, { weight: Number(e.target.value) })}
+                className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+              />
+              <select
+                defaultValue={set.weight_unit}
+                onChange={(e) =>
+                  handleSetChange(set.id, { weight_unit: e.target.value as "lbs" | "kg" })
+                }
+                className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+              >
+                <option value="lbs">lbs</option>
+                <option value="kg">kg</option>
+              </select>
+            </div>
           </div>
         ))}
       </div>
 
       {adding ? (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-400 w-14">Set {exercise.sets.length + 1}</span>
-          <input
-            type="number"
-            min={0}
-            placeholder="Reps"
-            value={newSet.reps || ""}
-            onChange={(e) => setNewSet({ ...newSet, reps: Number(e.target.value) })}
-            className="border rounded-md px-2 py-1 w-20"
-          />
-          <span className="text-neutral-400">reps</span>
-          <input
-            type="number"
-            min={0}
-            step="0.5"
-            placeholder="Weight"
-            value={newSet.weight || ""}
-            onChange={(e) => setNewSet({ ...newSet, weight: Number(e.target.value) })}
-            className="border rounded-md px-2 py-1 w-24"
-          />
-          <select
-            value={newSet.weightUnit}
-            onChange={(e) =>
-              setNewSet({ ...newSet, weightUnit: e.target.value as "lbs" | "kg" })
-            }
-            className="border rounded-md px-2 py-1"
-          >
-            <option value="lbs">lbs</option>
-            <option value="kg">kg</option>
-          </select>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-text-muted">Set {exercise.sets.length + 1}</span>
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              type="number"
+              min={0}
+              placeholder="Reps"
+              value={newSet.reps || ""}
+              onChange={(e) => setNewSet({ ...newSet, reps: Number(e.target.value) })}
+              className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+            />
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              placeholder="Weight"
+              value={newSet.weight || ""}
+              onChange={(e) => setNewSet({ ...newSet, weight: Number(e.target.value) })}
+              className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+            />
+            <select
+              value={newSet.weightUnit}
+              onChange={(e) =>
+                setNewSet({ ...newSet, weightUnit: e.target.value as "lbs" | "kg" })
+              }
+              className="border rounded-lg px-2 py-2 text-sm min-w-0 w-full"
+            >
+              <option value="lbs">lbs</option>
+              <option value="kg">kg</option>
+            </select>
+          </div>
           <button
             type="button"
             onClick={handleAddSet}
-            className="text-sm underline"
+            className="text-sm text-accent-orange font-medium self-start mt-1"
             disabled={isPending}
           >
-            Add
+            Add set
           </button>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="text-sm text-neutral-600 underline self-start"
+          className="text-sm text-accent-orange font-medium self-start"
         >
           + Add set
         </button>
