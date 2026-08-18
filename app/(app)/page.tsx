@@ -2,6 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { MonthNav } from "@/components/MonthNav";
 import { exerciseEmoji } from "@/lib/exerciseEmoji";
+import { GoalPrompt } from "@/components/GoalPrompt";
+import { DailyGoalCard } from "@/components/DailyGoalCard";
+import { LastWeekdaySummary, type WeekdaySummaryItem } from "@/components/LastWeekdaySummary";
+import { suggestNextWeight } from "@/lib/overload";
 
 function parseMonthParam(param: string | undefined): { year: number; month: number } {
   if (param && /^\d{4}-\d{2}$/.test(param)) {
@@ -11,6 +15,20 @@ function parseMonthParam(param: string | undefined): { year: number; month: numb
   const now = new Date();
   return { year: now.getFullYear(), month: now.getMonth() };
 }
+
+function isTableMissing(message: string) {
+  return /does not exist|schema cache/i.test(message);
+}
+
+function todayLocalISO() {
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+type HistorySet = { reps: number; weight: number; weight_unit: "lbs" | "kg" };
+type HistoryExercise = { name: string; sets: HistorySet[] };
+type HistoryWorkout = { workout_date: string; exercises: HistoryExercise[] };
 
 export default async function DashboardPage({
   searchParams,
@@ -25,6 +43,10 @@ export default async function DashboardPage({
   const monthEnd = new Date(year, month + 1, 1);
   const toISODate = (d: Date) => d.toISOString().slice(0, 10);
 
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+  const todayISO = todayLocalISO();
+
   const { count: totalWorkoutCount } = await supabase
     .from("workouts")
     .select("id", { count: "exact", head: true });
@@ -37,7 +59,6 @@ export default async function DashboardPage({
     .order("workout_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
@@ -45,6 +66,114 @@ export default async function DashboardPage({
   const thisWeekCount =
     workouts?.filter((w) => new Date(w.workout_date + "T00:00:00") >= startOfWeek)
       .length ?? 0;
+
+  // --- Daily goal (gracefully absent until its migration is applied) ---
+  let todayGoal: {
+    id: string;
+    completed_at: string | null;
+    items: { id: string; exerciseName: string; targetReps: number; exerciseId: string | null }[];
+  } | null = null;
+  let goalsTableExists = true;
+
+  const goalRes = await supabase
+    .from("daily_goals")
+    .select("id, completed_at, goal_items(id, exercise_name, target_reps, exercise_id)")
+    .eq("goal_date", todayISO)
+    .maybeSingle();
+
+  if (goalRes.error) {
+    if (isTableMissing(goalRes.error.message)) goalsTableExists = false;
+  } else if (goalRes.data) {
+    todayGoal = {
+      id: goalRes.data.id,
+      completed_at: goalRes.data.completed_at,
+      items: goalRes.data.goal_items.map((it) => ({
+        id: it.id,
+        exerciseName: it.exercise_name,
+        targetReps: it.target_reps,
+        exerciseId: it.exercise_id,
+      })),
+    };
+  }
+
+  // --- Routines, for the goal prompt's "load from routine" ---
+  let routines: { id: string; name: string; items: { exerciseName: string; targetReps: number }[] }[] = [];
+  const routinesRes = await supabase
+    .from("routines")
+    .select("id, name, routine_exercises(exercise_name, target_reps, position)");
+  if (!routinesRes.error && routinesRes.data) {
+    routines = routinesRes.data.map((r) => ({
+      id: r.id,
+      name: r.name,
+      items: [...r.routine_exercises]
+        .sort((a, b) => a.position - b.position)
+        .map((it) => ({ exerciseName: it.exercise_name, targetReps: it.target_reps })),
+    }));
+  }
+
+  const { data: exs } = await supabase.from("exercises").select("name");
+  const exerciseSuggestions = [...new Set((exs ?? []).map((e) => e.name))];
+
+  // --- History for "last time on this weekday" + progressive overload ---
+  const { data: history } = await supabase
+    .from("workouts")
+    .select("workout_date, exercises(name, sets(reps, weight, weight_unit))")
+    .lt("workout_date", todayISO)
+    .order("workout_date", { ascending: false })
+    .limit(200);
+
+  const historyRows = (history ?? []) as HistoryWorkout[];
+
+  const todayDow = now.getDay();
+  const lastSameWeekday = historyRows.find(
+    (w) => new Date(w.workout_date + "T00:00:00").getDay() === todayDow
+  );
+
+  // Most recent prior top-set per exercise name, across all history.
+  const lastTopSetByExercise = new Map<
+    string,
+    { weight: number; unit: "lbs" | "kg"; reps: number; date: string }
+  >();
+  for (const w of historyRows) {
+    for (const ex of w.exercises) {
+      if (lastTopSetByExercise.has(ex.name)) continue;
+      if (ex.sets.length === 0) continue;
+      const top = ex.sets.reduce((a, b) => (b.weight > a.weight ? b : a));
+      lastTopSetByExercise.set(ex.name, {
+        weight: top.weight,
+        unit: top.weight_unit,
+        reps: top.reps,
+        date: w.workout_date,
+      });
+    }
+  }
+
+  // Suggestions keyed by exercise name, only for exercises in today's goal
+  // (a target rep count is required to apply the heuristic).
+  const suggestions: Record<string, { weight: number; unit: "lbs" | "kg" } | null> = {};
+  if (todayGoal) {
+    for (const item of todayGoal.items) {
+      const last = lastTopSetByExercise.get(item.exerciseName);
+      suggestions[item.exerciseName] = last
+        ? suggestNextWeight(last.weight, last.unit, last.reps, item.targetReps)
+        : null;
+    }
+  }
+
+  const weekdaySummaryItems: WeekdaySummaryItem[] = lastSameWeekday
+    ? lastSameWeekday.exercises
+        .filter((ex) => ex.sets.length > 0)
+        .map((ex) => {
+          const top = ex.sets.reduce((a, b) => (b.weight > a.weight ? b : a));
+          return {
+            exerciseName: ex.name,
+            weight: top.weight,
+            unit: top.weight_unit,
+            reps: top.reps,
+            suggestion: suggestions[ex.name] ?? null,
+          };
+        })
+    : [];
 
   return (
     <div className="flex flex-col gap-5 pt-2">
@@ -73,6 +202,34 @@ export default async function DashboardPage({
           {thisWeekCount} workout{thisWeekCount === 1 ? "" : "s"} logged this week
         </p>
       </div>
+
+      {isCurrentMonth && (
+        <LastWeekdaySummary
+          weekdayLabel={now.toLocaleDateString("en-US", { weekday: "long" })}
+          dateLabel={
+            lastSameWeekday
+              ? new Date(lastSameWeekday.workout_date + "T00:00:00").toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
+              : ""
+          }
+          items={weekdaySummaryItems}
+        />
+      )}
+
+      {isCurrentMonth && goalsTableExists && (
+        todayGoal ? (
+          <DailyGoalCard
+            goalId={todayGoal.id}
+            items={todayGoal.items}
+            suggestions={suggestions}
+            alreadyComplete={!!todayGoal.completed_at}
+          />
+        ) : (
+          <GoalPrompt date={todayISO} routines={routines} exerciseSuggestions={exerciseSuggestions} />
+        )
+      )}
 
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold tracking-widest text-text-muted uppercase">

@@ -279,3 +279,113 @@ export async function deleteRoutine(routineId: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/routines");
 }
+
+export async function setDailyGoal(
+  date: string,
+  items: { exerciseName: string; targetReps: number }[]
+) {
+  const { supabase, user } = await requireUser();
+
+  const { data: goal, error: goalError } = await supabase
+    .from("daily_goals")
+    .insert({ user_id: user.id, goal_date: date })
+    .select()
+    .single();
+  if (goalError) throw new Error(goalError.message);
+
+  if (items.length > 0) {
+    const { error: itemsError } = await supabase.from("goal_items").insert(
+      items.map((it) => ({
+        goal_id: goal.id,
+        exercise_name: it.exerciseName,
+        target_reps: it.targetReps,
+      }))
+    );
+    if (itemsError) throw new Error(itemsError.message);
+  }
+
+  revalidatePath("/");
+  return { id: goal.id as string };
+}
+
+export async function completeGoalItem(
+  goalId: string,
+  itemId: string,
+  exerciseName: string,
+  input: SetInput
+) {
+  const { supabase, user } = await requireUser();
+
+  const { data: goal, error: goalFetchError } = await supabase
+    .from("daily_goals")
+    .select("goal_date")
+    .eq("id", goalId)
+    .single();
+  if (goalFetchError) throw new Error(goalFetchError.message);
+
+  let { data: workout } = await supabase
+    .from("workouts")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("workout_date", goal.goal_date)
+    .limit(1)
+    .maybeSingle();
+
+  if (!workout) {
+    const { data: newWorkout, error: workoutError } = await supabase
+      .from("workouts")
+      .insert({ user_id: user.id, workout_date: goal.goal_date, focus: "Daily Goal" })
+      .select()
+      .single();
+    if (workoutError) throw new Error(workoutError.message);
+    workout = newWorkout;
+  }
+  if (!workout) throw new Error("Failed to find or create today's workout");
+
+  const { count: existingCount } = await supabase
+    .from("exercises")
+    .select("*", { count: "exact", head: true })
+    .eq("workout_id", workout.id);
+
+  const { data: exercise, error: exerciseError } = await insertExerciseRow(supabase, {
+    workout_id: workout.id,
+    name: exerciseName,
+    position: existingCount ?? 0,
+    notes: null,
+  });
+  if (exerciseError) throw new Error(exerciseError.message);
+
+  const { error: setError } = await supabase.from("sets").insert({
+    exercise_id: exercise.id,
+    set_number: 1,
+    reps: input.reps,
+    weight: input.weight,
+    weight_unit: input.weightUnit,
+  });
+  if (setError) throw new Error(setError.message);
+
+  const { error: itemUpdateError } = await supabase
+    .from("goal_items")
+    .update({ exercise_id: exercise.id })
+    .eq("id", itemId);
+  if (itemUpdateError) throw new Error(itemUpdateError.message);
+
+  const { data: remaining } = await supabase
+    .from("goal_items")
+    .select("id")
+    .eq("goal_id", goalId)
+    .is("exercise_id", null);
+
+  let allComplete = false;
+  if (!remaining || remaining.length === 0) {
+    await supabase
+      .from("daily_goals")
+      .update({ completed_at: new Date().toISOString() })
+      .eq("id", goalId);
+    allComplete = true;
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/workouts/${workout.id}`);
+  return { allComplete, workoutId: workout.id as string };
+}
