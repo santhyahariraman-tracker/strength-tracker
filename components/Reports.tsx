@@ -80,24 +80,47 @@ export function Reports({ workouts }: { workouts: WorkoutRow[] }) {
     return streak;
   }, [workouts]);
 
+  const [frequencyView, setFrequencyView] = useState<"week" | "month">("week");
+
   const weeklyFrequency = useMemo(() => {
-    const buckets: { weekStart: number; label: string; count: number }[] = [];
+    const buckets: { bucketStart: number; label: string; count: number }[] = [];
     for (let i = 7; i >= 0; i--) {
       const ws = startOfWeek(now);
       ws.setDate(ws.getDate() - i * 7);
       buckets.push({
-        weekStart: ws.getTime(),
+        bucketStart: ws.getTime(),
         label: ws.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         count: 0,
       });
     }
     workouts.forEach((w) => {
       const ws = startOfWeek(new Date(w.workout_date + "T00:00:00")).getTime();
-      const bucket = buckets.find((b) => b.weekStart === ws);
+      const bucket = buckets.find((b) => b.bucketStart === ws);
       if (bucket) bucket.count++;
     });
     return buckets;
   }, [workouts]);
+
+  const monthlyFrequency = useMemo(() => {
+    const buckets: { bucketStart: number; label: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const ms = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({
+        bucketStart: ms.getTime(),
+        label: ms.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        count: 0,
+      });
+    }
+    workouts.forEach((w) => {
+      const d = new Date(w.workout_date + "T00:00:00");
+      const ms = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+      const bucket = buckets.find((b) => b.bucketStart === ms);
+      if (bucket) bucket.count++;
+    });
+    return buckets;
+  }, [workouts]);
+
+  const frequencyData = frequencyView === "week" ? weeklyFrequency : monthlyFrequency;
 
   const trendData = useMemo(() => {
     if (!activeExercise) return [];
@@ -196,10 +219,30 @@ export function Reports({ workouts }: { workouts: WorkoutRow[] }) {
           <StatTile label="Week streak" value={String(currentStreakWeeks)} />
         </div>
         <div className="rounded-xl border border-border bg-surface p-3">
-          <p className="text-xs text-text-muted mb-2">Workouts per week (last 8 weeks)</p>
-          <div className="h-40 w-full overflow-x-auto">
-            <ResponsiveContainer width="100%" height="100%" minWidth={280}>
-              <BarChart data={weeklyFrequency} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-text-muted">
+              Workouts per {frequencyView} (last {frequencyView === "week" ? "8 weeks" : "12 months"})
+            </p>
+            <div className="flex rounded-lg border border-border overflow-hidden text-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setFrequencyView("week")}
+                className={`px-2.5 py-1 ${frequencyView === "week" ? "bg-accent-purple text-white" : "text-text-muted"}`}
+              >
+                Week
+              </button>
+              <button
+                type="button"
+                onClick={() => setFrequencyView("month")}
+                className={`px-2.5 py-1 ${frequencyView === "month" ? "bg-accent-purple text-white" : "text-text-muted"}`}
+              >
+                Month
+              </button>
+            </div>
+          </div>
+          <div className="h-40 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={frequencyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="var(--border)" />
                 <XAxis
                   dataKey="label"
@@ -342,8 +385,8 @@ function TrendChart({
         <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: color }} />
         {title}
       </p>
-      <div className="h-36 w-full overflow-x-auto">
-        <ResponsiveContainer width="100%" height="100%" minWidth={280}>
+      <div className="h-36 w-full">
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--border)" />
             <XAxis
