@@ -133,6 +133,15 @@ export function DailyGoalCard({
         </p>
       </div>
 
+      {/* TEMP: confetti test button — remove after testing */}
+      <button
+        type="button"
+        onClick={fireGrandConfetti}
+        className="text-xs border border-dashed border-accent-orange text-accent-orange rounded-lg py-1.5 self-start px-3"
+      >
+        🎉 Test confetti
+      </button>
+
       <div className="flex flex-col gap-2">
         {items.map((item) => {
           const done = itemDone(item);
