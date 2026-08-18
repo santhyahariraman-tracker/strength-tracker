@@ -210,3 +210,72 @@ export async function addSet(
   if (error) throw new Error(error.message);
   revalidatePath(`/workouts/${workoutId}`);
 }
+
+export type RoutineItemInput = { exerciseName: string; targetReps: number };
+
+export async function createRoutine(name: string, items: RoutineItemInput[]) {
+  const { supabase, user } = await requireUser();
+
+  const { data: routine, error: routineError } = await supabase
+    .from("routines")
+    .insert({ user_id: user.id, name })
+    .select()
+    .single();
+  if (routineError) throw new Error(routineError.message);
+
+  if (items.length > 0) {
+    const { error: itemsError } = await supabase.from("routine_exercises").insert(
+      items.map((it, idx) => ({
+        routine_id: routine.id,
+        exercise_name: it.exerciseName,
+        target_reps: it.targetReps,
+        position: idx,
+      }))
+    );
+    if (itemsError) throw new Error(itemsError.message);
+  }
+
+  revalidatePath("/routines");
+  return { id: routine.id as string };
+}
+
+export async function updateRoutine(
+  routineId: string,
+  name: string,
+  items: RoutineItemInput[]
+) {
+  const { supabase } = await requireUser();
+
+  const { error: updateError } = await supabase
+    .from("routines")
+    .update({ name })
+    .eq("id", routineId);
+  if (updateError) throw new Error(updateError.message);
+
+  const { error: deleteError } = await supabase
+    .from("routine_exercises")
+    .delete()
+    .eq("routine_id", routineId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (items.length > 0) {
+    const { error: itemsError } = await supabase.from("routine_exercises").insert(
+      items.map((it, idx) => ({
+        routine_id: routineId,
+        exercise_name: it.exerciseName,
+        target_reps: it.targetReps,
+        position: idx,
+      }))
+    );
+    if (itemsError) throw new Error(itemsError.message);
+  }
+
+  revalidatePath("/routines");
+}
+
+export async function deleteRoutine(routineId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("routines").delete().eq("id", routineId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/routines");
+}
